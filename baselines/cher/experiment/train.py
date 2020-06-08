@@ -16,6 +16,7 @@ from baselines.her.rollout import RolloutWorker
 from baselines.her.util import mpi_fork
 import baselines.cher.config_curriculum as config_cur
 
+import three_finger.envs
 
 def mpi_average(value):
     if value == []:
@@ -165,7 +166,7 @@ def launch(
 @click.option('--n_epochs', type=int, default=50, help='the number of training epochs to run')
 @click.option('--num_cpu', type=int, default=1, help='the number of CPU cores to use (using MPI)')
 @click.option('--seed', type=int, default=0, help='the random seed used to seed both the environment and the training code')
-@click.option('--policy_save_interval', type=int, default=5, help='the interval with which policy pickles are saved. If set to 0, only the best and latest policy will be pickled.')
+@click.option('--policy_save_interval', type=int, default=0, help='the interval with which policy pickles are saved. If set to 0, only the best and latest policy will be pickled.')
 @click.option('--replay_strategy', type=click.Choice(['future', 'none']), default='future', help='the HER replay strategy to be used. "future" uses HER, "none" disables HER.')
 @click.option('--clip_return', type=int, default=1, help='whether or not returns should be clipped')
 def main(**kwargs):

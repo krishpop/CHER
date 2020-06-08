@@ -1,6 +1,7 @@
 import threading
 
 import numpy as np
+from baselines.her.util import transitions_in_episode_batch
 
 
 class ReplayBuffer:
@@ -58,7 +59,7 @@ class ReplayBuffer:
         """episode_batch: array(batch_size x (T or T+1) x dim_key)
         """
         batch_sizes = [len(episode_batch[key]) for key in episode_batch.keys()]
-        assert np.all(np.array(batch_sizes) == batch_sizes[0])
+        # assert np.all(np.array(batch_sizes) == batch_sizes[0])
         batch_size = batch_sizes[0]
 
         with self.lock:
@@ -66,9 +67,12 @@ class ReplayBuffer:
 
             # load inputs into buffers
             for key in self.buffers.keys():
-                self.buffers[key][idxs] = episode_batch[key]
+                t = episode_batch[key].shape[1]
+                T = self.buffer_shapes[key][0]
+                self.buffers[key][idxs] = np.pad(episode_batch[key],
+                        ((0,0), (0,T-t), (0,0)), constant_values=-np.inf)
 
-            self.n_transitions_stored += batch_size * self.T
+            self.n_transitions_stored += transitions_in_episode_batch(episode_batch)
 
     def get_current_episode_size(self):
         with self.lock:
@@ -98,7 +102,12 @@ class ReplayBuffer:
             idx_b = np.random.randint(0, self.current_size, overflow)
             idx = np.concatenate([idx_a, idx_b])
         else:
-            idx = np.random.randint(0, self.size, inc)
+            # randomly replace replay buffer
+            # idx = np.random.randint(0, self.size, inc)
+            # reset counter to the beginning of the index
+            idx = np.arange(inc)
+            self.current_size = 0
+
 
         # update replay size
         self.current_size = min(self.size, self.current_size+inc)

@@ -9,6 +9,7 @@ import tensorflow as tf
 import numpy as np
 
 from baselines.common import tf_util as U
+import three_finger.envs
 
 
 def store_args(method):

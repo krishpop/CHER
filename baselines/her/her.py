@@ -19,20 +19,25 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
     def _sample_her_transitions(episode_batch, batch_size_in_transitions):
         """episode_batch is {key: array(buffer_size x T x dim_key)}
         """
-        T = episode_batch['u'].shape[1]
+        ep_lens = []
+        for ep in episode_batch['u']:
+            ep_lens.append((~(ep == -np.inf).all(axis=1)).sum())
+        ep_lens = np.array(ep_lens, dtype=int)
         rollout_batch_size = episode_batch['u'].shape[0]
         batch_size = batch_size_in_transitions
 
         # Select which episodes and time steps to use.
+        T = episode_batch['u'].shape[1]
         episode_idxs = np.random.randint(0, rollout_batch_size, batch_size)
-        t_samples = np.random.randint(T, size=batch_size)
+        ep_lens = ep_lens[episode_idxs]
+        t_samples = np.random.randint(ep_lens, size=batch_size)
         transitions = {key: episode_batch[key][episode_idxs, t_samples].copy()
                        for key in episode_batch.keys()}
 
         # Select future time indexes proportional with probability future_p. These
         # will be used for HER replay by substituting in future goals.
         her_indexes = np.where(np.random.uniform(size=batch_size) < future_p)
-        future_offset = np.random.uniform(size=batch_size) * (T - t_samples)
+        future_offset = np.random.uniform(size=batch_size) * (ep_lens - t_samples)
         future_offset = future_offset.astype(int)
         future_t = (t_samples + 1 + future_offset)[her_indexes]
 

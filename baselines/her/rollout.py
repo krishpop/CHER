@@ -38,6 +38,9 @@ class RolloutWorker:
 
         self.success_history = deque(maxlen=history_len)
         self.Q_history = deque(maxlen=history_len)
+        
+        self.info_history = {k: deque(maxlen=history_len) for k in self.info_keys}
+        self.ep_len_history = deque(maxlen=history_len)
 
         self.n_episodes = 0
         self.g = np.empty((self.rollout_batch_size, self.dims['g']), np.float32)  # goals
@@ -72,6 +75,7 @@ class RolloutWorker:
         ag = np.empty((self.rollout_batch_size, self.dims['g']), np.float32)  # achieved goals
         o[:] = self.initial_o
         ag[:] = self.initial_ag
+        dones = np.zeros(self.rollout_batch_size)
 
         # generate episodes
         obs, achieved_goals, acts, goals, successes = [], [], [], [], []
@@ -100,14 +104,17 @@ class RolloutWorker:
             success = np.zeros(self.rollout_batch_size)
             # compute new states and observations
             for i in range(self.rollout_batch_size):
+                #if dones[i]:
+                #    continue
                 try:
                     # We fully ignore the reward here because it will have to be re-computed
                     # for HER.
-                    curr_o_new, _, _, info = self.envs[i].step(u[i])
-                    if 'is_success' in info:
+                    curr_o_new, _, d, info = self.envs[i].step(u[i])
+                    if 'success' in info:
                         success[i] = info['is_success']
                     o_new[i] = curr_o_new['observation']
                     ag_new[i] = curr_o_new['achieved_goal']
+                    dones[i] = d
                     for idx, key in enumerate(self.info_keys):
                         info_values[idx][t, i] = info[key]
                     if self.render:
@@ -125,8 +132,12 @@ class RolloutWorker:
             successes.append(success.copy())
             acts.append(u.copy())
             goals.append(self.g.copy())
+
             o[...] = o_new
             ag[...] = ag_new
+            #if dones.all():
+            #    break
+
         obs.append(o.copy())
         achieved_goals.append(ag.copy())
         self.initial_o[:] = o
@@ -137,6 +148,8 @@ class RolloutWorker:
                        ag=achieved_goals)
         for key, value in zip(self.info_keys, info_values):
             episode['info_{}'.format(key)] = value
+            self.info_history[key].append(value[-1, :].mean())
+        self.ep_len_history.append(np.mean([len(ep) for ep in successes]))
 
         # stats
         successful = np.array(successes)[-1, :]
@@ -154,6 +167,8 @@ class RolloutWorker:
         """
         self.success_history.clear()
         self.Q_history.clear()
+        for k in self.info_history:
+            self.info_history[k].clear()
 
     def current_success_rate(self):
         return np.mean(self.success_history)
@@ -175,6 +190,8 @@ class RolloutWorker:
         if self.compute_Q:
             logs += [('mean_Q', np.mean(self.Q_history))]
         logs += [('episode', self.n_episodes)]
+        for v in self.info_history:
+            logs += [('mean_{}'.format(v), np.mean(self.info_history[v]))]
 
         if prefix is not '' and not prefix.endswith('/'):
             return [(prefix + '/' + key, val) for key, val in logs]
