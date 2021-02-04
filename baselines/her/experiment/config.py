@@ -8,11 +8,21 @@ from baselines import logger
 from baselines.her.ddpg import DDPG
 from baselines.her.her import make_sample_her_transitions
 
+from rrc_iprl_package.envs import rrc_utils, env_wrappers
+
 
 DEFAULT_ENV_PARAMS = {
     'FetchReach-v0': {
         'n_cycles': 10,
     },
+    'rrc_iprl_package.envs:real_robot_challenge_phase_2_lv1-v1': {
+        'max_u': 0.2,
+        'layers': 2,
+        'hidden': 64,
+        'Q_lr': 0.0001,
+        'pi_lr': 0.0001,
+        'n_cycles': 10
+    }
 }
 
 
@@ -69,6 +79,10 @@ def prepare_params(kwargs):
 
     env_name = kwargs['env_name']
     def make_env():
+        if 'rrc' in env_name:
+            env = gym.make(env_name)
+            env = env_wrappers.FlattenGoalWrapper(env)
+            return env
         return gym.make(env_name)
     kwargs['make_env'] = make_env
     tmp_env = cached_make_env(kwargs['make_env'])

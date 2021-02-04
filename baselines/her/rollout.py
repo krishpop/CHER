@@ -110,7 +110,7 @@ class RolloutWorker:
                     # We fully ignore the reward here because it will have to be re-computed
                     # for HER.
                     curr_o_new, _, d, info = self.envs[i].step(u[i])
-                    if 'success' in info:
+                    if 'is_success' in info:
                         success[i] = info['is_success']
                     o_new[i] = curr_o_new['observation']
                     ag_new[i] = curr_o_new['achieved_goal']

@@ -1,12 +1,15 @@
 from stable_baselines import HER, SAC, DQN, DDPG, TD3
 from stable_baselines.common.atari_wrappers import FrameStack
-import three_finger.envs
+from stable_baselines.common.vec_env import DummyVecEnv, VecCheckNan
 
 import click
 import gym
 import os
 import os.path as osp
 import time
+
+from rrc_iprl_package.envs import env_wrappers
+from gym.wrappers import FlattenObservation
 
 ALGS = {'sac': SAC, 'ddpg': DDPG, 'td3': TD3}
 
@@ -17,7 +20,7 @@ ALGS = {'sac': SAC, 'ddpg': DDPG, 'td3': TD3}
 @click.option('--n_steps', type=float, default=1e6, help='the number of training steps to run')
 @click.option('--seed', type=int, default=0, help='the random seed used to seed both the environment and the training code')
 @click.option('--lr', type=float, default=1e-3, help='learning rate')
-@click.option('--alg', type=str, default='sac', help='alg to use (sac, ddpg, td3)')
+@click.option('--alg', type=str, default='td3', help='alg to use (sac, ddpg, td3)')
 @click.option('--gamma', type=float, default=0.99, help='discount factor')
 @click.option('-l', '--num_layers', type=int, default=3, help='num hidden layers')
 @click.option('-hu', '--layer_size', type=int, default=256, help='hidden layer size')
@@ -34,17 +37,22 @@ def train(env_name, exp_name, n_steps, seed, lr, alg, gamma, num_layers,
     exp_dir = osp.join(exp_root, exp_name, hms_time)
     os.makedirs(exp_dir)
 
-    env = gym.make(env_name, reward_type='sparse', drop_penalty=-abs(drop_pen))
+    def make_env():
+        env = gym.make(env_name, initializer=env_wrappers.RandomInitializer(1))
+        env = env_wrappers.ScaledActionWrapper(env, goal_env=False)
+        env = FlattenObservation(env)
+        #env._max_episode_steps = env.env._max_episode_steps
+        #env = env_wrappers.FlattenGoalWrapper(env)
+        return env
 
-    model = HER('MlpPolicy', env, ALGS.get(alg.lower()), n_sampled_goal=4,
-                tensorboard_log=exp_dir,
-                seed=seed,
+    # env = DummyVecEnv([make_env])
+    env = make_env()
+
+    model = HER('MlpPolicy', env, ALGS.get(alg.lower()), tensorboard_log=exp_dir,
+                seed=0, verbose=1, buffer_size=int(1e6), gamma=gamma,
+                learning_rate=lr, batch_size=256, n_sampled_goal=4,
                 goal_selection_strategy='future',
-                verbose=1, buffer_size=int(1e6),
-                learning_rate=lr,
-                gamma=gamma, batch_size=256,
                 policy_kwargs=dict(layers=[layer_size]*num_layers))
-
     # Train for n_steps
     model.learn(int(n_steps),)
     # Save the trained agent

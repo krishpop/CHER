@@ -63,6 +63,9 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
                                    batch_size_in_transitions):
         if config_cur.goal_type == "ROTATION":
             goals, ac_goals = goals[..., 3:], ac_goals[..., 3:]
+        elif config_cur.goal_type == "REPOSITION":
+            goals, ac_goals = goals[..., :3], ac_goals[..., :3]
+
 
         num_neighbor = 1
         kgraph = NearestNeighbors(

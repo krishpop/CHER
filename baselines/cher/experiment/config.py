@@ -9,11 +9,20 @@ from baselines.her.ddpg import DDPG
 
 from baselines.cher.her import make_sample_her_transitions
 
+from rrc_iprl_package.envs import rrc_utils, env_wrappers
 
 DEFAULT_ENV_PARAMS = {
     'FetchReach-v0': {
         'n_cycles': 10,
     },
+    'rrc_iprl_package.envs:real_robot_challenge_phase_2_lv1-v1': {
+        'max_u': 1.,
+        'layers': 2,
+        'hidden': 64,
+        'Q_lr': 0.0001,
+        'pi_lr': 0.0001,
+        'n_cycles': 10
+    }
 }
 
 
@@ -28,7 +37,7 @@ DEFAULT_PARAMS = {
     'pi_lr': 0.001,  # actor learning rate
     'buffer_size': int(1E6),  # for experience replay
     'polyak': 0.95,  # polyak averaging coefficient
-    'action_l2': 1.0,  # quadratic penalty on actions (before rescaling by max_u)
+    'action_l2': .01,  # quadratic penalty on actions (before rescaling by max_u)
     'clip_obs': 200.,
     'scope': 'ddpg',  # can be tweaked for testing
     'relative_goals': False,
@@ -70,6 +79,12 @@ def prepare_params(kwargs):
 
     env_name = kwargs['env_name']
     def make_env():
+        if 'rrc' in env_name:
+            env = gym.make(env_name)
+            env = env_wrappers.ScaledActionWrapper(env, goal_env=True)
+            env._max_episode_steps = env.env._max_episode_steps
+            env = env_wrappers.FlattenGoalWrapper(env)
+            return env
         return gym.make(env_name)
     kwargs['make_env'] = make_env
     tmp_env = cached_make_env(kwargs['make_env'])
@@ -84,7 +99,7 @@ def prepare_params(kwargs):
         del kwargs['lr']
     for name in ['buffer_size', 'hidden', 'layers',
                  'network_class',
-                 'polyak', 
+                 'polyak',
                  'batch_size', 'Q_lr', 'pi_lr',
                  'norm_eps', 'norm_clip', 'max_u',
                  'action_l2', 'clip_obs', 'scope', 'relative_goals']:

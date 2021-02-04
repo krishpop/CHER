@@ -124,9 +124,9 @@ def launch(
 
     rollout_params = {
         'exploit': False,
-        'use_target_net': False,
+        'use_target_net': True,
         'use_demo_states': True,
-        'compute_Q': False,
+        'compute_Q': True,
         'T': params['T'],
     }
 
